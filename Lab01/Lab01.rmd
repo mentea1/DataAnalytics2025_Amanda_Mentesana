@@ -45,7 +45,6 @@ boxplot(EPI.new, APO.new) #using a boxplot to visually compare variables for EPI
 ```
 
 The first histogram using the kernel density estimation shows there are two areas where the data may be centered, at about 42 and 65.
-
 ```{r}
 #Histogram with kernal density estimation 
 
@@ -57,7 +56,6 @@ rug(EPI.new)
 ```
 
 To further look at these trends, using the normal distribution, we can see there are trends in the data which show two populations at 42 and 65.
-
 ```{r}
 # histogram with normal distribution estimations
 hist(EPI.new, seq(20., 80., 1.0, ),prob=TRUE) 
@@ -79,10 +77,10 @@ p<-dnorm(x,mean=65, sd=5,log=FALSE) #fitting to a normal curve distribution with
 lines(x,.12*p) # plots 12% of p over the given range
 ```
 
+
 ## Excercise 2: Fitting a Distribution
 
 Based on the distributions, the EPI.new variable reasonably fits the normal distribution fit, and shows possible bimodality.
-
 ```{r}
 plot(ecdf(EPI.new), do.points=FALSE, verticals=TRUE) 
 
@@ -98,10 +96,10 @@ qqline(EPI.new)
 
 ```
 
+
 ## Excercise 2a: Fitting the MPE Variable
 
 We can see that the MPE variable has a different distribution and range than EPI. The mean is 69.85, yet both the 3rd quartile and maximum value is 100. When looking at the stem-and-leaf plot we can see that the data is skewed towards the value 100.
-
 ```{r}
 summary(MPE.new) #Output shows Median, Mean, Quartiles and range
 
@@ -113,7 +111,6 @@ hist(MPE.new)
 ```
 
 The first histogram using the kernal density estimation shows two peaks, with skewedness to 100.
-
 ```{r}
 #Histogram with kernal density estimation 
 
@@ -125,7 +122,6 @@ rug(MPE.new)
 ```
 
 To further look at these trends, using the normal distribution, we can see there are trends in the data which show two populations of data, one centered around 50 with a large spread of data and the other at 100 with a very narrow range of data.
-
 ```{r}
 # histogram with normal distribution estimations
 hist(MPE.new, seq(0., 110., 10., ),prob=TRUE) 
@@ -146,7 +142,6 @@ lines(x,.6*p) # plots 0.6*p over the given range
 ```
 
 The normal Q-Q plot shows that data is too peaked at the end of the distribution to fit it well.
-
 ```{r}
 plot(ecdf(MPE.new), do.points=FALSE, verticals=TRUE) 
 
@@ -159,10 +154,10 @@ qqplot(rt(250, df = 5), MPE.new, xlab = "Q-Q plot for t dsn")
 qqline(MPE.new)
 ```
 
+
 ## Excercise 2b: Fitting the SPI Variable
 
 We can see that the SPI variable has a larger spread than the EPI variable. The data also seems equally distributed using the stem and leaf plot.
-
 ```{r}
 summary(SPI.new) #Output shows Median, Mean, Quartiles and range
 
@@ -176,7 +171,6 @@ hist(SPI.new)
 ```
 
 The first histogram using the kernal density estimation shows very low variation in the SPI.new data distribution. Fitting to a normal curve was not helpful in describing the data.
-
 ```{r}
 #Histogram with kernal density estimation 
 
@@ -192,13 +186,12 @@ q<- dnorm(x,mean=50, sd=3,log=FALSE) #fitting to a normal curve distribution wit
 ```
 
 The normal Q-Q plot shows the SPI.new data is heavily tailed however it is fit to the data well.
-
 ```{r}
 
 plot(ecdf(SPI.new), do.points=FALSE, verticals=TRUE) 
 
 qqnorm(SPI.new)
-qqline(SPI.new) 
+qqline(SPI.new)  
 
 #Make a Q-Q plot against the generating distribution by: 
 qqplot(rnorm(250), SPI.new, xlab = "Q-Q plot for norm dsn") 
