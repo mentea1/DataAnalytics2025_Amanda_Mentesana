@@ -1,0 +1,172 @@
+---
+title: "Lab02"
+author: "Amanda Mentesana"
+date: "2025-02-07"
+output: pdf_document
+---
+
+Set up libraries and read dataset.
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = FALSE)
+
+#install libraries
+library(readr)
+library(EnvStats)
+library("ggplot2")
+
+#read the dataset
+#since we are making multiple models, we need to filter differently for different variables used
+unfiltered_dataset <- read_csv("C:/Users/amanda/Downloads/NY-House-Dataset.csv")
+
+```
+
+
+# Linear Model 1
+## Using PROPERTYSQFT as a predictor for PRICE
+From the following, we can see that the data must be log-fit in order to be interpretable
+```{r}
+#plot scatter-plot of the log of propertysqft by price, it was determined log would be more useful to see than an unscaled scatterplot
+#ggplot(unfiltered_dataset, aes(x = log10(PROPERTYSQFT), y = log10(PRICE))) +
+  #geom_point()
+
+## From seeing the scatterplot, even of log fitted data, it is necessary to filter data further
+dataset1 <- unfiltered_dataset
+dataset1 <- dataset1[dataset1$PRICE<195000000,] # prices less than a high value to exclude outlier
+dataset1 <- dataset1[dataset1$PROPERTYSQFT!=2184.207862,] # propertysqft less than a certain value to exclude repeated value
+
+#a data point with the repeated value will now be noted as NA
+dataset1$PROPERTYSQFT[dataset1$BROKERTITLE=="Brokered by Douglas Elliman - 575 Madison Ave"][85]
+
+## fit linear model
+lmod <- lm(PRICE~PROPERTYSQFT, data = dataset1)
+
+lmod_log <- lm(log10(PRICE)~log10(PROPERTYSQFT), data = dataset1)
+
+## print model output
+summary(lmod) # a meaningful statistic to pull is that the multiple r-squared is 0.01, which is fairly low
+summary(lmod_log)# this model has a higher r-squared value, showing it is a better fit
+
+## basic scatter plot of 2 variables using log fit and normal fit
+plot(PRICE~PROPERTYSQFT, data = dataset1) + abline(lmod) # the data is not fit correctly, so we can see that this is not succifient to determine trends
+plot(log10(PRICE)~log10(PROPERTYSQFT), data = dataset1) + abline(lmod_log) # as we can see, the data is better clustered and easier to make judgements on compared to normal fit
+
+## ggplot scatter plot of 2 variables
+
+ggplot(dataset1, aes(x = PROPERTYSQFT, y = PRICE)) +
+  geom_point() +
+  stat_smooth(method = "lm", col="red") # again, the data is not fit well for these variables and it is hard to determine anything from them, even with the smoothing plotted
+
+ggplot(dataset1, aes(x = log10(PROPERTYSQFT), y = log10(PRICE))) +
+  geom_point() +
+  stat_smooth(method = "lm", col="red") #in comparison to the last plot, we can more reasonably see how the fit of the trendline fits the data!
+
+# plot the residuals to show standard deviation from the model
+ggplot(lmod, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="green") #again, compared to the unfit model we cannot make conclusions.
+
+ggplot(lmod_log, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="green")# the spread of residual plots shows that the distribution of the variability is well-spread from the model
+```
+
+# Linear Model 2
+## Using PROPERTYSQFT/BEDS as a predictor for PRICE
+From the following, we can see that the data must be log-fit in order to be interpretative. Total square footage may not be an accurate way to depict multi-family homes. Assuming larger spaces cost more, this model may show that there is a relationship between price and the size of the property per bedroom
+```{r}
+dataset2 <- unfiltered_dataset
+#plot scatter-plot of the log of beds and bathrooms by price, it was determined log would be more useful to see than unscaled based on the scatterplot
+#ggplot(dataset2, aes(x = log10(PROPERTYSQFT/BEDS), y = log10(PRICE))) +
+  #geom_point()# it is clear from the distribution that it is wasier to see with a log relationship
+
+## From seeing the scatterplot, even of log fitted data, it is necessary to filter data further
+dataset2 <- unfiltered_dataset
+dataset2 <- dataset2[dataset2$PRICE<195000000,] # prices less than a high value to exclude outlier
+dataset2 <- dataset2[dataset2$PROPERTYSQFT!=2184.207862,] # propertysqft less than a certain value to exclude repeated value
+ggplot(dataset2, aes(x = (PROPERTYSQFT/BEDS), y = log10(PRICE))) +
+  geom_point()
+
+## fit linear model
+lmod <- lm(PRICE~PROPERTYSQFT/BEDS, data = dataset2)
+
+lmod_log <- lm(log10(PRICE)~log10(PROPERTYSQFT/BEDS), data = dataset2)
+
+## print model output
+summary(lmod) # a meaningful statistic to pull is that the multiple r-squared is 0.2659
+summary(lmod_log)# this model has a lower r-squared value, than the linear fit, which is suprising because the model looks worse for the normal plot
+
+## ggplot scatter plot of 2 variables
+ggplot(dataset2, aes(x = log10(PROPERTYSQFT/BEDS), y = log10(PRICE))) +
+  geom_point() +
+  stat_smooth(method = "lm", col="red") #in comparison to the last plot, we can more reasonably see how the fit of the trendline fits the data!
+
+# plot the residuals to show standard deviation from the model
+ggplot(lmod_log, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="green")# the spread of residual plots shows that the distribution of the variability is well-spread from the model
+
+ggplot(lmod, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="green") # as we can see from the residual plot, the linear model is less reliable, as variability is increasing rather than having even distribution of its distances from the linear model.
+```
+
+
+# Linear Model 3
+## Using BEDS+BATH as a predictor for PRICE
+From the following, we can see that the data must be log-fit in order to be interpretable.
+```{r}
+dataset3 <- unfiltered_dataset
+#plot scatter-plot of the log of beds and bathrooms by price, it was determined log would be more useful to see than an unscaled scatterplot
+#ggplot(dataset3, aes(x = log10(BEDS+BATH), y = log10(PRICE))) +
+  #geom_point()# it is clear from the distribution that it is wasier to see with a log relationship
+
+## From seeing the scatterplot, even of log fitted data, it is necessary to filter data further
+dataset3 <- dataset3[dataset3$PRICE<195000000,] # prices less than a high value to exclude the outlier
+
+## fit linear model
+lmod <- lm(PRICE~BEDS+BATH, data = dataset3)
+
+lmod_log <- lm(log10(PRICE)~log10(BEDS+BATH), data = dataset3)
+
+## print model output
+#summary(lmod) # a meaningful statistic to pull is that the multiple r-squared is very low
+summary(lmod_log)# this model has a higher r-squared value, of about 0.35 but is still fairly unsignificant
+
+## ggplot scatter plot of 2 variables
+ggplot(dataset3, aes(x = log10(BEDS+BATH), y = log10(PRICE))) +
+  geom_point() +
+  stat_smooth(method = "lm", col="red") #in comparison to the last plot, we can more reasonably see how the fit of the trendline fits the data!
+
+# plot the residuals to show standard deviation from the model
+ggplot(lmod_log, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="green")# the spread of residual plots shows that the distribution of the variability is well-spread from the model
+```
+Overall, I think the first linear model, comparing the square footage with price is the best indicator of fit, as that model yielded the largest r-squared value. This is not the only indicator, however, comparing values such as bed and bath number added countable numbers to the model, which caused clusters at specific values, for example, many properties were 1 bed but with varying prices.
+
+# Linear Model 4
+## Using zipcode as a predictor for PRICE
+I wanted to look at the dataset in terms of location, but obviously, a lot of those are given in the address but we would need a way to simplify the address. The zipcode was compared to the log-form of price, but is not very descriptive in its meaning, likely because of how broad certain zipcodes in NYC may be.
+```{r}
+#make a new column in the dataset
+dataset4 <- unfiltered_dataset
+dataset4$zipcode <- substring(dataset4$MAIN_ADDRESS, nchar(dataset4$MAIN_ADDRESS) - 4, nchar(dataset4$MAIN_ADDRESS))
+
+#plot scatter-plot of the log of propertysqft by price, it was determined log would be more useful to see than an unscaled scatterplot
+#ggplot(dataset4, aes(x = (zipcode), y = log10(PRICE))) +
+  #geom_point()+ theme(axis.text.x = element_text(angle = 90))
+
+## From seeing the scatterplot, even of log fitted data, it is necessary to filter data further
+dataset4 <- dataset4[dataset4$PRICE<195000000,] #filter the outlier price
+dataset4 <- dataset4[dataset4$PROPERTYSQFT!=2184.207862,] # propertysqft less than a certain value to exclude repeated value
+
+
+## fit linear model
+lmod <- lm(PRICE~zipcode, data = dataset4)
+lmod_log <- lm(log10(PRICE)~(zipcode), data = dataset4)
+
+## print model output
+summary(lmod_log)# this model has a 0.4 r-squared value, showing it is aan okay fit but there is likely a better fit...
+
+## basic scatter plot of 2 variables using log fit and normal fit
+plot(log10(PRICE)~(zipcode), data = dataset4) + abline(lmod_log) # zipcode is not log fit as it is more of a descriptive number than a value, similar to number of beds or baths
+
+## ggplot scatter plot of 2 variables
+ggplot(dataset4, aes(x = (zipcode), y = log10(PRICE))) +
+  geom_point() +
+  stat_smooth(method = "lm", col="red") #in comparison to the last plot, we can more reasonably see how the fit of the trendline fits the data!
+
+# plot the residuals to show standard deviation from the model
+ggplot(lmod_log, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="green") # the spread of residual plots shows that the distribution of the variability is well-spread from the model
+```
+
