@@ -1,0 +1,249 @@
+---
+title: "Lab02"
+author: "Amanda Mentesana"
+date: "2025-02-07"
+output: pdf_document
+---
+
+Firstly, set up libraries and read dataset.
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = FALSE)
+
+#install libraries
+library(readr)
+library(EnvStats)
+library(ggplot2)
+library(ggfortify)
+library(class)
+
+
+#read the wine data set
+wine <- read_csv("C:/Users/amanda/Downloads/wine/wine.data")
+colnames(wine) <- c("class","Alcohol","Malic acid","Ash","Alcalinity of ash","Magnesium","Total phenols","Flavanoids","Nonflavanoid phenols","Proanthocyanins","Color intensity","Hue","OD280/OD315 of diluted wines","Proline")
+
+```
+
+# 1. Compute the PCs and plot the dataset using the 1st and 2nd PC.
+```{r}
+summary(wine)
+
+wine$class <- as.factor(wine$class)
+
+# Performing PCA with scaling variables
+wine.pca <- princomp(wine[, -1]) #only using 13 columns
+
+# Plotting the first two principal components
+autoplot(wine.pca, data = wine, colour = 'class', x = 1, y = 2,
+         loadings = TRUE, loadings.colour = "grey",
+         loadings.label = TRUE, loadings.label.size = 3) +
+  ggtitle("PC1 and PC2 of Wine Data") +
+  theme_minimal()
+
+```
+
+# 2. Identify the variables that contribute the most to the 1st PC.
+```{r}
+summary(wine.pca)
+loading_scores <- wine.pca$loadings[, 1] #loadings for PC1
+loading_scores #view the loading scores
+print(sort(abs(loading_scores), decreasing=TRUE))
+
+## The largest variables contributing to PC1 are Proline, Magnesium, and Alcalinity of ash, however, Proline contributes the vast majority.
+```
+
+# 3. Drop the variables least contributing to the 1st PC and rerun PCA. 
+```{r}
+print(sort(abs(loading_scores), decreasing=FALSE))#sort in decreasing order
+
+#The least contributing variables are Nonflavanoid phenols(9), Hue(12), Ash(4), Proanthocyanins(10), Malic acid(3), OD280/OD315 of diluted wines(13)
+
+spilled.wine <- wine[ , -c(3, 4, 9, 10, 12, 13)]
+
+# Perform PCA again on the reduced dataset
+spilled.wine.pca <- princomp(spilled.wine[, -1])
+``` 
+
+# 4. Train a classifier model (e.g. kNN) to predict wine type using the original dataset.
+```{r}
+# sample create list of (70% of 177) numbers randomly sampled from 1-177
+n = 177
+s_wine <- sample(n,n*.7)
+
+## create train & test sets based on sampled indexes 
+dataset.train <- wine[s_wine, ]
+dataset.test <- wine[-s_wine, ]
+
+# simple estimate of k  ~~ shows k at about 12
+k = round(sqrt(n)) -1
+k
+
+### Here and below, I try to find a best value of k but the original estimate shows better results.
+
+## train knn models for multiple values of k and plot accuracies
+
+# list of k
+k.list <- c(3,5,7,9,11,13,15,17,19)
+
+# empty list for accuracy
+accuracy.list <- c()
+
+# loop: train&predict model for each k, compute accuracy and append it to list
+for (k in k.list) {
+  
+  knn.predicted <- class::knn(train = dataset.train[,2:14], test = dataset.test[,2:14], cl = dataset.train$class, k = k)
+  
+  contingency.table <- table(knn.predicted, dataset.test$class, dnn=list('predicted','actual'))
+  
+  accuracy <- sum(diag(contingency.table))/length(dataset.test$class)
+  
+  accuracy.list <- c(accuracy.list,accuracy)
+  
+}
+
+
+# plot acccuracy with k, limiting values of y axis between .9 & 1
+plot(k.list, accuracy.list, type = "b", ylim = c(0.6,0.9), main = "Wine Dataset kNN")
+accuracy.list
+# best accuracy when k=11, but may vary each run!
+
+#dealing with varying max K
+max_k <- max(accuracy.list) #max accuracy
+max_index <- which.max(accuracy.list) #what position
+cat("k is maximum at ", k.list[max_index]) #report back the index for the k.list vector
+
+## train model & predict in one step ('knn' function from 'class' library)
+wine.knn.predicted <- class::knn(train = dataset.train[ ,2:14], test = dataset.test[ ,2:14], cl = dataset.train$class, k = k.list[max_index])
+
+# create contingency table/ confusion matrix 
+wine.contingency.table <- table(wine.knn.predicted, dataset.test$class, dnn=list('predicted','actual'))
+wine.contingency.table
+
+# calculate classification accuracy
+wine.sum <- sum(diag(wine.contingency.table))/length(dataset.test$class)
+wine.sum
+
+pred.knn <- wine.knn.predicted
+
+cm = as.matrix(table(Actual = dataset.test$class, Predicted = pred.knn))
+
+cm
+
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+accuracy = sum(diag)/n
+
+accuracy
+
+wine.precision = diag / colsums
+wine.recall = diag / rowsums 
+wine.f1 = 2 * wine.precision * wine.recall / (wine.precision + wine.recall) 
+
+data.frame(wine.recall, wine.precision, wine.f1)
+
+``` 
+# 5. Train a classifier model to predict wine type using the data projected into the first 3 PCs (scores), from PCA model where lowest PCs are dropped.
+```{r}
+three_PCs_data <- data.frame(class = spilled.wine$class, spilled.wine.pca$scores[ , 1:3]) #extract data from the PCA data scores
+
+# sample create list of (70% of 177) numbers randomly sampled from 1-177
+n = 177
+s_wine <- sample(n,n*.7)
+
+## create train & test sets based on sampled indexes 
+dataset.train <- three_PCs_data[s_wine, ]
+
+dataset.test <- three_PCs_data[-s_wine, ]
+
+# simple estimate of k  ~~ shows k at about 12
+k = round(sqrt(n)) -1
+k
+
+### Here and below, I try to find a best value of k but the original estimate shows better results.
+
+## train knn models for multiple values of k and plot accuracies
+
+# list of k
+k.list <- c(3,5,7,9,11,13,15,17,19,21,23)
+
+# empty list for accuracy
+accuracy.list <- c()
+
+# loop: train&predict model for each k, compute accuracy and append it to list
+for (k in k.list) {
+  
+  knn.predicted <- class::knn(train = dataset.train[,2:4], test = dataset.test[,2:4], cl = dataset.train$class, k = k)
+  
+  contingency.table <- table(knn.predicted, dataset.test$class, dnn=list('predicted','actual'))
+  
+  accuracy <- sum(diag(contingency.table))/length(dataset.test$class)
+  
+  accuracy.list <- c(accuracy.list,accuracy)
+  
+}
+
+
+# plot acccuracy with k, limiting values of y axis between .9 & 1
+plot(k.list,accuracy.list,type = "b", ylim = c(0.6,.9), main = "Three PCs kNN")
+accuracy.list #from this accuracy plot, we can see that k=15 is the highest for the run we did but this may vary each run slightly. 
+
+#dealing with varying max K
+max_k <- max(accuracy.list) #max accuracy
+max_index <- which.max(accuracy.list) #what position
+cat("k is maximum at ", k.list[max_index]) #report back the index for the k.list vector
+
+## Using k-9
+## train model & predict in one step ('knn' function from 'class' library)
+three.knn.predicted <- class::knn(train = dataset.train[ ,2:4], test = dataset.test[ ,2:4], cl = dataset.train$class, k = k.list[max_index])
+
+# create contingency table/ confusion matrix 
+three.contingency.table <- table(three.knn.predicted, dataset.test$class, dnn=list('predicted','actual'))
+three.contingency.table
+
+# calculate classification accuracy
+three.sum <- sum(diag(three.contingency.table))/length(dataset.test$class)
+three.sum 
+
+pred.knn <- three.knn.predicted
+
+cm = as.matrix(table(Actual = dataset.test$class, Predicted = pred.knn))
+
+cm
+
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+accuracy = sum(diag)/n
+accuracy
+
+three.precision = diag / colsums
+three.recall = diag / rowsums 
+three.f1 = 2 * three.precision * three.recall / (three.precision + three.recall) 
+
+data.frame(three.recall, three.precision, three.f1)
+``` 
+
+# 6. Compare the 2 classification models using contingency tables and prevision/recall/f1 metrics
+```{r}
+#Recall the contingency tables from the three and wine models
+
+wine.contingency.table
+wine.sum
+
+three.contingency.table
+three.sum
+
+data.frame(wine.recall, three.recall, wine.precision, three.precision, wine.f1, three.f1)
+
+# We can see from the comparison of recall, precision, f1 and accuracy, that these models perform comparably. For the particular run I did, the accuracies from the contingency table sums showed that the models were equally good at predicting the type of wine. In the case of recall, the wine subset performed better at predicting only one of the categories, for precision three and wine were equally matched, and for f1 score three outperformed on 2/3 classifications. Both models are relatively good at predictions, but potentially using both models to make predictions is the optimal choice.
+``` 
