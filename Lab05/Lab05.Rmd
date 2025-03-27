@@ -1,0 +1,295 @@
+---
+title: "Lab05"
+author: "Amanda Mentesana"
+date: "2025-03-21"
+output: pdf_document
+---
+
+Firstly, set up libraries and read dataset.
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = FALSE)
+
+#install libraries
+library(readr)
+library(EnvStats)
+library(ggplot2)
+library(ggfortify)
+library(class)
+library(caret)
+library(e1071)
+library(readr)
+
+
+#read the wine data set
+wine <- read_csv("C:/Users/amanda/Downloads/wine/wine.data")
+colnames(wine) <- c("class","Alcohol","Malic acid","Ash","Alcalinity of ash","Magnesium","Total phenols","Flavanoids","Nonflavanoid phenols","Proanthocyanins","Color intensity","Hue","OD280/OD315 of diluted wines","Proline")
+
+summary(wine)
+str(wine)
+wine <- wine[wine$class != 1, ]
+wine$class <- as.factor(wine$class)
+wine <- na.omit(wine)
+
+
+wine <- wine[ , -c(3, 4, 9, 10, 12, 13)] #cleaning taken from Lab04 PCA 
+```
+
+Train 2 SVM classifiers to predict the type of wine using a subset of the other 13 variables. 
+You may choose the subset based on previous analysis. 
+One using a linear kernel and another of your choice. 
+
+# Train 2 SVM classifiers to predict the type of wine using a subset of the other 13 variables.
+Based on a comparison to svm classifiers with recall, precision and f1 metrics, our first model with a polynomial kernel outperforms the model with a polynomial kernel in each category.
+```{r}
+# ## split train/test
+n <- nrow(wine)
+train.indexes <- sample(n,0.7*n)
+
+train <- wine[train.indexes,]
+test <- wine[-train.indexes,]
+
+## separate x (features) & y (class labels)
+X <- train[,2:8] 
+Y <- train[,1]
+
+## feature boxplots
+boxplot(X, main="wine features")
+
+## class label distributions
+plot(Y) #there are three classes: 1, 2, 3
+
+
+ggplot(train, aes(x = Proline, y = Magnesium, color = class)) + geom_point() +theme_minimal() # there seems to be the most separation between class 2 and 3
+
+#-----------------------------------------------------------
+## train SVM model 1 using linear kernel
+svm.mod1 <- svm(class ~ `Proline`+ `Magnesium`, data = train, kernel = 'linear')
+svm.mod1
+
+train.pred <- predict(svm.mod1, train)
+cm = as.matrix(table(Actual = train$class, Predicted = train.pred))
+cm
+
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+recall_1 = diag / rowsums 
+precision_1 = diag / colsums
+f1_1 = 2 * precision_1 * recall_1 / (precision_1 + recall_1) 
+
+a <- data.frame(precision_1, recall_1, f1_1)
+a
+
+make.grid = function(x, n = 75) {
+  grange = apply(x, 2, range)
+  x1 = seq(from = grange[1,1], to = grange[2,1], length = n)
+  x2 = seq(from = grange[1,2], to = grange[2,2], length = n)
+  expand.grid(`Proline` = x1, `Magnesium` = x2)
+}
+
+x <- train[,2:8]
+y <- as.numeric(train$class)
+y[y==2] <- -1
+
+xgrid = make.grid(x)
+xgrid[1:8,]
+
+ygrid = predict(svm.mod1, xgrid)
+
+plot(xgrid, col = c("red","blue")[as.numeric(ygrid)], pch = 20, cex = .2)
+
+points(x, col = y + 3, pch = 19)
+points(x[svm.mod1$index,], pch = 5, cex = 2)
+
+#---------------------------------------------------------------
+## train SVM model 2 using a polynomial kernel
+svm.mod2 <- svm(class ~ `Proline`+ `Magnesium`, data = train, kernel = 'polynomial')
+svm.mod2
+
+train.pred <- predict(svm.mod2, train)
+
+cm = as.matrix(table(Actual = train$class, Predicted = train.pred))
+cm
+
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+recall_2 = diag / rowsums 
+precision_2 = diag / colsums
+f1_2 = 2 * precision_2 * recall_2 / (precision_2 + recall_2) 
+
+b <- data.frame(precision_2, recall_2, f1_2)
+b
+
+make.grid = function(x, n = 75) {
+  grange = apply(x, 2, range)
+  x1 = seq(from = grange[1,1], to = grange[2,1], length = n)
+  x2 = seq(from = grange[1,2], to = grange[2,2], length = n)
+  expand.grid(`Proline` = x1, `Magnesium` = x2)
+}
+
+x <- train[,2:8]
+y <- as.numeric(train$class)
+y[y==2] <- -1
+
+xgrid = make.grid(x)
+xgrid[1:8,]
+
+ygrid = predict(svm.mod2, xgrid)
+
+plot(xgrid, col = c("red","blue")[as.numeric(ygrid)], pch = 20, cex = .2)
+
+points(x, col = y + 3, pch = 19)
+points(x[svm.mod2$index,], pch = 5, cex = 2)
+
+c <- data.frame(precision_1, precision_2, recall_1, recall_2, f1_1, f1_2)
+c
+
+```
+# Use tune.svm to find optimum C and Gamma values.
+When using the tune function, the model with "optimal parameters" for Gamma and cost do not perform as well as the svm.mod2.
+```{r}
+## Tuned SVM - polynomial
+tuned.svm <- tune.svm(class~ `Proline`+ `Magnesium`, data = train, kernel = 'polynomial',gamma = seq(1/2^nrow(train),1, .01), cost = 2^seq(-6, 4, 2))
+tuned.svm[["best.parameters"]] 
+
+svm.mod3 <- svm(class ~ `Proline` + `Magnesium`, data = train, kernel = 'polynomial', gamma = 1.033976e-25, cost = 0.015625)
+svm.mod3
+
+train.pred <- predict(svm.mod3, train)
+
+cm = as.matrix(table(Actual = train$class, Predicted = train.pred))
+cm
+
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+recall_3 = diag / rowsums 
+precision_3 = diag / colsums
+f1_3 = 2 * precision_3 * recall_3 / (precision_3 + recall_3) 
+
+d <- data.frame(precision_3, recall_3, f1_3)
+d
+
+make.grid = function(x, n = 75) {
+  grange = apply(x, 2, range)
+  x1 = seq(from = grange[1,1], to = grange[2,1], length = n)
+  x2 = seq(from = grange[1,2], to = grange[2,2], length = n)
+  expand.grid(`Proline` = x1, `Magnesium` = x2)
+}
+
+x <- train[,2:8]
+y <- as.numeric(train$class)
+y[y==2] <- -1
+
+xgrid = make.grid(x)
+xgrid[1:8,]
+
+ygrid = predict(svm.mod3, xgrid)
+
+plot(xgrid, col = c("red","blue")[as.numeric(ygrid)], pch = 20, cex = .2)
+
+points(x, col = y + 3, pch = 19)
+points(x[svm.mod3$index,], pch = 5, cex = 2)
+
+e <- data.frame(precision_1, precision_2, precision_3, recall_1, recall_2, recall_3, f1_1, f1_2, f1_3)
+e
+```
+
+# Choose another classification method (kNN, NaiveBayes, etc.) and train a classifier based on the same features. 
+```{r}
+
+# simple estimate of k  ~~ shows k at about 12
+k = round(sqrt(n)) -1
+k
+
+### Here and below, I try to find a best value of k but the original estimate shows better results.
+
+## train knn models for multiple values of k and plot accuracies
+
+# list of k
+k.list <- c(3,5,7,9,11,13,15,17)
+
+# empty list for accuracy
+accuracy.list <- c()
+
+# loop: train&predict model for each k, compute accuracy and append it to list
+for (k in k.list) {
+  
+  knn.predicted <- class::knn(train = train[,2:4], test = test[,2:4], cl = train$class, k = k)
+  
+  contingency.table <- table(knn.predicted, test$class, dnn=list('predicted','actual'))
+  
+  accuracy <- sum(diag(contingency.table))/length(test$class)
+  
+  accuracy.list <- c(accuracy.list,accuracy)
+  
+}
+
+
+# plot acccuracy with k, limiting values of y axis between .6 & .9
+plot(k.list,accuracy.list,type = "b", ylim = c(0.6,.9), main = "Three PCs kNN")
+accuracy.list #from this accuracy plot, we can see that k=15 is the highest for the run we did but this may vary each run slightly. 
+
+#dealing with varying max K
+max_k <- max(accuracy.list) #max accuracy
+max_index <- which.max(accuracy.list) #what position
+cat("k is maximum at ", k.list[max_index]) #report back the index for the k.list vector
+
+## Using k-9
+## train model & predict in one step ('knn' function from 'class' library)
+knn.predicted <- class::knn(train = train[ ,2:4], test = test[ ,2:4], cl = train$class, k = k.list[max_index])
+
+# create contingency table/ confusion matrix 
+contingency.table <- table(knn.predicted, test$class, dnn=list('predicted','actual'))
+contingency.table
+
+# calculate classification accuracy
+sum <- sum(diag(contingency.table))/length(test$class)
+sum 
+
+pred.knn <- knn.predicted
+
+cm = as.matrix(table(Actual = test$class, Predicted = pred.knn))
+cm
+
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+accuracy = sum(diag)/n
+accuracy
+
+precision_4 = diag / colsums
+recall_4 = diag / rowsums 
+f1_4 = 2 * precision_4 * recall_4 / (precision_4 + recall_4) 
+
+f <- data.frame(recall_4, precision_4, f1_4)
+f
+```
+
+# Compare the performance of the 2 models (Precision, Recall, F1)
+The second SVM has the best preformance.
+```{r}
+g <- data.frame(precision_2, precision_4, recall_2, recall_4, f1_2, f1_4)
+g
+```
