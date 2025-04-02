@@ -1,0 +1,194 @@
+---
+title: "Lab06"
+author: "Amanda Mentesana"
+date: "2025-03-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(readr)
+library(ggplot2)
+library(e1071)
+library(caret)
+library(cv)
+
+
+ny_housing <- read_csv("C:/Users/amanda/Downloads/NY-House-Dataset (1).csv")
+
+
+```
+# Train and Evaluate 3 Regression Models Predicting Price from Square Footage using MAE, MSE, and RMSE
+
+## 1) Linear Regression Model
+```{r}
+## 1) Untrained Model
+
+## Plot dataset to identify best shape and potential outliers
+ggplot(ny_housing, aes(x = log10(PROPERTYSQFT), y = log10(PRICE))) + geom_point() #this is a more understandable shape than the non-log transformed
+
+# Clean dataset for weird repeating outlier value.
+ny_housing <- ny_housing[-which(ny_housing$PROPERTYSQFT==2184.207862),]
+ 
+lin.mod <- lm(log10(PRICE) ~ log10(PROPERTYSQFT), ny_housing)
+summary(lin.mod) #multiple R-squared of 0.5828
+
+# Plot cleaned dataset and linear regression fit 
+ggplot(ny_housing, aes(x = log10(PROPERTYSQFT), y = log10(PRICE))) + geom_point() + stat_smooth(method = "lm", col="blue")
+ggplot(lin.mod, aes(x = .fitted, y = .resid)) + geom_point() + geom_hline(yintercept = 0, col="blue") #reasonably low spread residual plot.
+
+
+## Trained Model
+
+## split train/test, these indicies will be used for testing other models as well.
+train.indexes <- sample(nrow(ny_housing),0.7*nrow(ny_housing))
+train <- ny_housing[train.indexes,]
+test <- ny_housing[-train.indexes,]
+
+## LM train
+lin.mod.train <- lm(log10(PRICE) ~ log10(PROPERTYSQFT), train)
+
+summary(cv(lin.mod))
+
+lm.pred <- predict(lin.mod, test)
+
+## err = predicted - real
+err <- lm.pred-log10(test$PRICE)
+
+## MAE
+abs.err <- abs(err)
+mean.abs.err <- mean(abs.err)
+
+## MSE
+sq.err <- err^2
+mean.sq.err <- mean(sq.err)
+
+## RMSE
+sq.err <- err^2
+mean.sq.err <- mean(sq.err)
+root.mean.sq.err <- sqrt(mean.sq.err)
+
+
+lin.mod.train.df <- data.frame(mean.abs.err, mean.sq.err, root.mean.sq.err)
+lin.mod.train.df
+
+```
+## 2) SVM- Linear Model
+```{r}
+
+svm.lin.mod0 <- svm(log10(PRICE) ~ log10(PROPERTYSQFT), ny_housing, kernel="linear")
+
+svm.lin.pred0 <- predict(svm.lin.mod0, ny_housing)
+
+ggplot(ny_housing, aes(x = log10(PROPERTYSQFT), y = log10(PRICE))) +
+  geom_point() +
+  geom_line(aes(x=log10(PROPERTYSQFT), y=svm.lin.pred0), col="green")
+
+
+## Train the SVM Linear Model
+## Linear SVM Model
+k = 100
+mae <- c()
+mse <- c()
+rmse <- c()
+
+for (i in 1:k) {
+  train.indexes <- sample(nrow(ny_housing),0.7*nrow(ny_housing))
+  
+  train <- ny_housing[train.indexes,]
+  test <- ny_housing[-train.indexes,]
+  
+  svm.lin.mod <- svm(log10(PRICE) ~ log10(PROPERTYSQFT), ny_housing, kernel="linear")
+  
+  svm.lin.pred <- predict(svm.lin.mod, test)  
+  
+  err <- svm.lin.pred-log10(test$PRICE)
+  
+  abs.err <- abs(err)
+  mean.abs.err <- mean(abs.err)
+  
+  sq.err <- err^2
+  mean.sq.err <- mean(sq.err)
+  
+  root.mean.sq.err <- sqrt(mean.sq.err)  
+  
+  mae <- c(mae, mean.abs.err)
+  mse <- c(mse, mean.sq.err)
+  rmse <- c(rmse, root.mean.sq.err)
+}
+
+mae.m <- c()
+mse.m <- c()
+rmse.m <- c()
+mae.m <- mean(mae)
+mse.m <- mean(mse)
+rmse.m <- mean(rmse)
+svm.lin.df <- data.frame(mae.m, mse.m, rmse.m)
+svm.lin.df
+```
+
+## 3) SVM- Polynomial Model
+```{r}
+# Untrained model plotted
+
+svm.poly.mod0 <- svm(log10(PRICE) ~ log10(PROPERTYSQFT), ny_housing, kernel="polynomial")
+svm.poly.pred0 <- predict(svm.poly.mod0, ny_housing)
+
+ggplot(ny_housing, aes(x = log10(PROPERTYSQFT), y = log10(PRICE))) +
+  geom_point() +
+  geom_line(aes(x=log10(PROPERTYSQFT), y=svm.poly.pred0), col="darkgreen") #this plot likely is not the best fit of the data
+
+
+## Polynomial SVM Model
+k = 100
+mae <- c()
+mse <- c()
+rmse <- c()
+
+for (i in 1:k) {
+  train.indexes <- sample(nrow(ny_housing),0.7*nrow(ny_housing))
+  
+  train <- ny_housing[train.indexes,]
+  test <- ny_housing[-train.indexes,]
+  
+  svm.pol.mod <- svm(log10(PRICE) ~ log10(PROPERTYSQFT), ny_housing, kernel="polynomial")
+  
+  svm.pol.pred <- predict(svm.pol.mod, test)  
+  
+  err <- svm.pol.pred-log10(test$PRICE)
+  
+  abs.err <- abs(err)
+  mean.abs.err <- mean(abs.err)
+  
+  sq.err <- err^2
+  mean.sq.err <- mean(sq.err)
+  
+  root.mean.sq.err <- sqrt(mean.sq.err)  
+  
+  mae <- c(mae,mean.abs.err)
+  mse <- c(mse,mean.sq.err)
+  rmse <- c(rmse,root.mean.sq.err)
+}
+
+mae.m <- c()
+mse.m <- c()
+rmse.m <- c()
+mae.m <- mean(mae)
+mse.m <- mean(mse)
+rmse.m <- mean(rmse)
+svm.pol.df <- data.frame(mae.m, mse.m, rmse.m)
+svm.pol.df
+```
+
+
+
+```{r}
+# Comparison of error of the three models
+
+lin.mod.train.df
+svm.lin.df
+svm.pol.df ## Even though the polynomial model was the least helpful in terms of being specific to the fit of the data, it has the lowest RMSE
+```
+
